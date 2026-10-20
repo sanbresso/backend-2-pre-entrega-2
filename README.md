@@ -1,14 +1,15 @@
+
 # Plataforma de Eventos e Inscripciones
 
 ## Pre-entrega 2 — Registro Seguro de Usuarios
 
-### Descripción
+## Descripción
 
 Proyecto backend desarrollado como parte del curso **PBE II — Diseño y Arquitectura Backend**.
 
 La aplicación está orientada a la gestión de eventos e inscripciones de usuarios.
 
-La Pre-entrega 1 estableció la arquitectura modular inicial. En esta segunda pre-entrega se incorpora el registro seguro de usuarios, incluyendo validaciones, normalización de email, hashing de contraseñas con bcrypt y persistencia en MongoDB mediante Mongoose.
+La Pre-entrega 1 estableció la arquitectura modular inicial. En esta segunda pre-entrega se incorpora el registro seguro de usuarios, incluyendo validaciones, normalización del email, hashing de contraseñas con bcrypt y persistencia en MongoDB mediante Mongoose.
 
 ## Tecnologías utilizadas
 
@@ -25,21 +26,24 @@ La Pre-entrega 1 estableció la arquitectura modular inicial. En esta segunda pr
 
 - Node.js y npm instalados.
 - MongoDB Community Server instalado y en ejecución.
-- Un cliente HTTP como Postman o curl para realizar las pruebas.
+- Un cliente HTTP, como Postman o curl, para realizar las pruebas.
 
 ## Instalación
 
-**1. Obtener el proyecto**
+### 1. Clonar el repositorio
 
-Clonar el repositorio público de la Pre-entrega 2 y abrir su carpeta.
+```bash
+git clone https://github.com/sanbresso/backend-2-pre-entrega-2.git
+cd backend-2-pre-entrega-2
+```
 
-**2. Instalar las dependencias**
+### 2. Instalar las dependencias
 
 ```bash
 npm install
 ```
 
-**3. Configurar las variables de entorno**
+### 3. Configurar las variables de entorno
 
 Crear un archivo `.env` en la raíz del proyecto, tomando como referencia `.env.example`.
 
@@ -54,9 +58,9 @@ JWT_SECRET=reemplazar_por_clave_segura
 
 La variable `JWT_SECRET` queda preparada para futuros módulos de autenticación. Todavía no se utiliza en el registro.
 
-El archivo `.env` está excluido del repositorio mediante `.gitignore`.
+El archivo `.env` está excluido del repositorio mediante `.gitignore` para evitar publicar información sensible.
 
-**4. Iniciar el servidor**
+### 4. Iniciar el servidor
 
 Modo desarrollo:
 
@@ -122,9 +126,11 @@ src/
 - **Config:** contiene la configuración de conexión a MongoDB.
 - **Middlewares:** proporcionan procesamiento adicional y manejo de errores.
 
-El flujo de registro sigue la secuencia:
+El flujo de registro sigue esta secuencia:
 
 **Router → Controller → Service → Repository → DAO → Modelo User → MongoDB**
+
+El servicio utiliza el helper de bcrypt para generar el hash de la contraseña antes de guardar al usuario.
 
 ## Modelo User
 
@@ -140,9 +146,15 @@ El modelo contiene los siguientes campos:
 | `createdAt` | Fecha de creación |
 | `updatedAt` | Fecha de actualización |
 
-Los roles permitidos son `user`, `organizer` y `admin`.
+Los roles permitidos son:
+
+- `user`
+- `organizer`
+- `admin`
 
 En el registro público se asigna siempre el rol `user`, sin aceptar modificaciones desde el cuerpo de la solicitud.
+
+El esquema utiliza `timestamps: true` para registrar las fechas de creación y actualización.
 
 ## Endpoint de registro
 
@@ -150,7 +162,7 @@ En el registro público se asigna siempre el rol `user`, sin aceptar modificacio
 
 Permite registrar un usuario de forma segura.
 
-**Campos esperados en el body:**
+### Campos esperados en el body
 
 ```json
 {
@@ -167,13 +179,14 @@ Todos los campos son obligatorios.
 
 - Nombre y apellido obligatorios.
 - Email obligatorio y con formato válido.
-- Normalización de email mediante `trim()` y `toLowerCase()`.
+- Normalización del email mediante `trim()` y `toLowerCase()`.
 - Contraseña de al menos 8 caracteres.
 - Verificación de email previamente registrado.
 - Asignación del rol `user` desde el backend.
 - Hashing de la contraseña mediante bcrypt antes de guardarla.
+- Exclusión de la contraseña y su hash de la respuesta HTTP.
 
-### Respuesta exitosa — HTTP 201
+### Respuesta exitosa — HTTP 201 Created
 
 ```json
 {
@@ -190,7 +203,7 @@ Todos los campos son obligatorios.
 
 La respuesta no incluye el campo `password` ni su hash.
 
-### Error por campos faltantes — HTTP 400
+### Error por campos faltantes — HTTP 400 Bad Request
 
 ```json
 {
@@ -199,7 +212,7 @@ La respuesta no incluye el campo `password` ni su hash.
 }
 ```
 
-### Error por email inválido — HTTP 400
+### Error por email inválido — HTTP 400 Bad Request
 
 ```json
 {
@@ -208,7 +221,7 @@ La respuesta no incluye el campo `password` ni su hash.
 }
 ```
 
-### Error por contraseña corta — HTTP 400
+### Error por contraseña corta — HTTP 400 Bad Request
 
 ```json
 {
@@ -217,12 +230,21 @@ La respuesta no incluye el campo `password` ni su hash.
 }
 ```
 
-### Email duplicado — HTTP 409
+### Email duplicado — HTTP 409 Conflict
 
 ```json
 {
   "status": "error",
   "message": "El email ya está registrado"
+}
+```
+
+### Error interno — HTTP 500 Internal Server Error
+
+```json
+{
+  "status": "error",
+  "message": "Error interno del servidor"
 }
 ```
 
@@ -236,11 +258,39 @@ curl -i -X POST http://localhost:8080/api/sessions/register \
   -d '{"first_name":"Ana","last_name":"Perez","email":"ana@mail.com","password":"Secreta123"}'
 ```
 
-Se espera una respuesta HTTP 201 cuando el correo no está registrado.
+Se espera una respuesta HTTP 201 si el correo no está registrado.
 
-Si el mismo email se utiliza nuevamente, se espera una respuesta HTTP 409.
+Si se utiliza nuevamente el mismo email, se espera una respuesta HTTP 409.
 
-También se recomienda probar campos faltantes, emails inválidos, contraseñas cortas e intentos de asignar el rol `admin`.
+Para realizar nuevos registros exitosos, utilizar un email que todavía no exista en la base de datos.
+
+### Casos de prueba realizados
+
+| Prueba | Código HTTP esperado | Resultado |
+|---|---|---|
+| Registro exitoso | 201 | Correcto |
+| Campos obligatorios faltantes | 400 | Correcto |
+| Email con formato inválido | 400 | Correcto |
+| Contraseña menor a 8 caracteres | 400 | Correcto |
+| Email previamente registrado | 409 | Correcto |
+| Intento de asignar rol admin | 201, con rol user | Correcto |
+| Respuesta sin contraseña | 201, sin password | Correcto |
+
+También se verificó el almacenamiento de contraseñas mediante hashes de bcrypt en MongoDB.
+
+### Protección contra asignación de roles
+
+Si un usuario intenta enviar el siguiente campo adicional:
+
+```json
+{
+  "role": "admin"
+}
+```
+
+El backend ignora ese valor y asigna automáticamente el rol `user`.
+
+De esta manera, se aplica el principio de menor privilegio y se evita que un usuario obtenga permisos administrativos mediante el registro público.
 
 ## Seguridad de las contraseñas
 
@@ -250,9 +300,21 @@ Se utiliza `bcrypt.hash()` con factor de costo 10.
 
 El backend guarda solamente el hash de la contraseña, nunca su valor original.
 
-Para verificar contraseñas en futuras implementaciones de login, el helper incluye `bcrypt.compare()`.
+Para verificar contraseñas en una futura implementación del login, el helper incluye `bcrypt.compare()`.
 
-El modelo User configura `select: false` para el campo `password`, y el servicio construye la respuesta utilizando únicamente campos permitidos.
+El modelo `User` configura `select: false` para el campo `password`, y el servicio construye la respuesta utilizando únicamente campos permitidos.
+
+### Medidas de seguridad implementadas
+
+- Validaciones de entrada en el backend.
+- Normalización del correo electrónico.
+- Prevención de usuarios duplicados.
+- Índice único para el email en MongoDB.
+- Hashing de contraseñas mediante bcrypt.
+- Control del rol asignado en el registro público.
+- Exclusión de información sensible en las respuestas.
+- Manejo de errores HTTP.
+- Uso de variables de entorno para la configuración.
 
 ## Verificación en MongoDB
 
@@ -272,9 +334,11 @@ Los documentos registrados deben contener:
 
 La contraseña original no debe aparecer en la base de datos ni en las respuestas de la API.
 
+Esta verificación permite confirmar la persistencia efectiva mediante Mongoose y el correcto tratamiento de datos sensibles.
+
 ## Otros endpoints disponibles
 
-**GET /api/health**
+### GET /api/health
 
 ```json
 {
@@ -283,7 +347,7 @@ La contraseña original no debe aparecer en la base de datos ni en las respuesta
 }
 ```
 
-**GET /api/events**
+### GET /api/events
 
 ```json
 {
@@ -292,7 +356,7 @@ La contraseña original no debe aparecer en la base de datos ni en las respuesta
 }
 ```
 
-**GET /api/sessions**
+### GET /api/sessions
 
 ```json
 {
@@ -322,6 +386,7 @@ Estos endpoints se mantienen desde la Pre-entrega 1.
 - Protección de contraseñas con bcrypt.
 - Separación de responsabilidades en capas.
 - Respuestas HTTP sin datos sensibles.
+- Pruebas de registro exitoso y manejo de errores.
 
 ## Próximas funcionalidades
 
